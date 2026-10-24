@@ -1,5 +1,10 @@
 // Builds playground requests asking Jev to pick the best spymaster clue for a board.
 //
+// The board lives in playground/board.json (created with the original test board if missing).
+//   node scripts/clue-test.ts new-board  -> moves the current playground files into
+//                                           playground/archive/, deals a random board and
+//                                           builds its round 1 request.
+//
 // A choice question allows at most 255 options, so this runs as a two-round tournament:
 //   node scripts/clue-test.ts          -> playground/round1.json: the candidates split across
 //                                         several choice questions in one request.
@@ -16,9 +21,9 @@
 // Each request is written three ways: <name>.json (whole request), <name>-state.json and
 // <name>-questions.json, for playgrounds that take state and questions separately.
 
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { CLUE_BANK } from '../src/clueBank.ts';
-import { validateClue, type Card, type Team } from '../src/game.ts';
+import { newBoard, validateClue, type Card, type Team } from '../src/game.ts';
 import { fitInstructions, fitState, RUBRIC, RUBRIC_LABELS, type Rating } from '../src/rubric.ts';
 import { clueNumber } from '../src/spymaster.ts';
 import { WORDS } from '../src/words.ts';
@@ -26,25 +31,43 @@ import { WORDS } from '../src/words.ts';
 const MAX_OPTIONS = 255;
 const FINALISTS_PER_GROUP = 5;
 
-const BOARD: Record<Team, string[]> = {
+type Board = Record<Team, string[]>;
+
+const BOARD_FILE = 'playground/board.json';
+const TEAMS: Team[] = ['red', 'blue', 'neutral', 'assassin'];
+
+/** The board the first experiments used; written to BOARD_FILE when there isn't one yet. */
+const DEFAULT_BOARD: Board = {
   red: ['LOG', 'YARD', 'VAN', 'SUIT', 'FIRE', 'REVOLUTION', 'MOUSE', 'CALF', 'HAWK'],
   blue: ['PIANO', 'GERMANY', 'CHURCH', 'PIPE', 'COURT', 'MASS', 'MINE', 'ANGEL'],
   neutral: ['PILOT', 'PIRATE', 'MOUNT', 'SINK', 'SPINE', 'LEAD', 'WASHER'],
   assassin: ['TIME'],
 };
 
-const cards: Card[] = (Object.entries(BOARD) as [Team, string[]][]).flatMap(([team, words]) =>
-  words.map((word) => ({ word, team, revealed: false }))
-);
+function saveBoard(b: Board) {
+  mkdirSync('playground', { recursive: true });
+  writeFileSync(BOARD_FILE, JSON.stringify(b, null, 2) + '\n');
+}
 
-const state = {
-  game: 'Codenames',
-  role: "You are the red team's spymaster. Give one single-word clue that connects as many red words as possible.",
-  redWords: BOARD.red,
-  avoid: { assassin: BOARD.assassin, blueTeam: BOARD.blue, neutral: BOARD.neutral },
-  rules:
-    'A good clue strongly suggests several red words and does not suggest the assassin, blue words or neutral words. Pointing at the assassin loses the game instantly.',
-};
+function loadBoard(): Board {
+  if (!existsSync(BOARD_FILE)) saveBoard(DEFAULT_BOARD);
+  return JSON.parse(readFileSync(BOARD_FILE, 'utf8'));
+}
+
+let cards: Card[];
+let state: Record<string, unknown>;
+
+function useBoard(b: Board) {
+  cards = TEAMS.flatMap((team) => b[team].map((word) => ({ word, team, revealed: false })));
+  state = {
+    game: 'Codenames',
+    role: "You are the red team's spymaster. Give one single-word clue that connects as many red words as possible.",
+    redWords: b.red,
+    avoid: { assassin: b.assassin, blueTeam: b.blue, neutral: b.neutral },
+    rules:
+      'A good clue strongly suggests several red words and does not suggest the assassin, blue words or neutral words. Pointing at the assassin loses the game instantly.',
+  };
+}
 
 const INSTRUCTIONS =
   'Which candidate clue would lead a guesser to the largest number of red words, without leading them to the assassin, blue words or neutral words?';
@@ -130,8 +153,32 @@ function number(clue: string) {
   );
 }
 
+/** Archives the current board's files (requests and pasted responses), then deals a new board. */
+function newBoardCommand() {
+  const previous = loadBoard();
+  const files = readdirSync('playground').filter((f) => f.endsWith('.json'));
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const stamp = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`;
+  const dir = `playground/archive/${stamp}_${previous.red[0]}`;
+  mkdirSync(dir, { recursive: true });
+  for (const f of files) renameSync(`playground/${f}`, `${dir}/${f}`);
+  console.log(`Moved ${files.length} files to ${dir}/`);
+
+  const dealt = newBoard();
+  const next = Object.fromEntries(
+    TEAMS.map((team) => [team, dealt.filter((c) => c.team === team).map((c) => c.word)])
+  ) as Board;
+  saveBoard(next);
+  useBoard(next);
+  for (const team of TEAMS) console.log(`${team.padEnd(9)}${next[team].join(', ')}`);
+  round1();
+}
+
 const [mode, ...args] = process.argv.slice(2);
-if (mode === 'round2') round2();
+useBoard(loadBoard());
+if (mode === 'new-board') newBoardCommand();
+else if (mode === 'round2') round2();
 else if (mode === 'check') check(args);
 else if (mode === 'number') number(args[0]);
 else round1();
