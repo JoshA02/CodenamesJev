@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import { newBoard, outcome, remaining, reveal, rivalTurn, validateClue, type Card, type Team } from './game.ts';
-import { hasApiKey, pickGuess, rateClue, RUBRIC_LABELS, type Guess, type Rating } from './jev.ts';
+import { hasApiKey, pickGuess, rateClue, type Guess } from './jev.ts';
+import { RUBRIC_LABELS, type Rating } from './rubric.ts';
 
 type Phase = 'clue' | 'scoring' | 'guessing' | 'rival';
 
