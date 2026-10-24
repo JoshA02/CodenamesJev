@@ -1,0 +1,218 @@
+:root {
+  --bg: #f6f5f2;
+  --fg: #1c1c1f;
+  --muted: #6b6b72;
+  --surface: #ffffff;
+  --border: #d9d8d3;
+  --red: #c8372d;
+  --red-soft: #f7dcd9;
+  --blue: #2c5fbf;
+  --blue-soft: #d9e3f7;
+  --neutral: #a38f6c;
+  --neutral-soft: #eee6d6;
+  --assassin: #26262b;
+  --assassin-soft: #cfcfd4;
+  --accent: #6a4cd6;
+  --error: #b3261e;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--fg);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161618;
+    --fg: #ececef;
+    --muted: #9b9ba4;
+    --surface: #212125;
+    --border: #3a3a40;
+    --red: #e5584d;
+    --red-soft: #3d2322;
+    --blue: #5d8ef0;
+    --blue-soft: #1f2a42;
+    --neutral: #b9a37c;
+    --neutral-soft: #332e25;
+    --assassin: #0b0b0d;
+    --assassin-soft: #45454c;
+    --accent: #9d86ff;
+    --error: #ff8a80;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+h1 { margin: 0 0 6px; font-size: 1.6rem; }
+h2 { margin: 0 0 8px; font-size: 1rem; }
+
+.hint { margin: 0 0 10px; color: var(--muted); font-size: 0.92rem; }
+
+.scores { display: flex; gap: 8px; }
+.pill {
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #fff;
+}
+.pill.red { background: var(--red); }
+.pill.blue { background: var(--blue); }
+
+.t-red { color: var(--red); }
+.t-blue { color: var(--blue); }
+.t-neutral { color: var(--neutral); }
+.t-assassin { color: var(--fg); text-decoration: underline wavy var(--red); }
+.muted { color: var(--muted); }
+
+.banner {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+
+.board {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Unrevealed cards show a soft tint of their team: you are the spymaster. */
+.card {
+  position: relative;
+  min-height: 78px;
+  padding: 10px 3px 22px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--surface);
+  transition: background 0.3s, color 0.3s;
+  container-type: inline-size;
+}
+.card.red { border-color: var(--red); background: var(--red-soft); }
+.card.blue { border-color: var(--blue); background: var(--blue-soft); }
+.card.neutral { border-color: var(--neutral); background: var(--neutral-soft); }
+.card.assassin { border-color: var(--assassin); background: var(--assassin-soft); }
+
+.card.revealed { color: #fff; }
+.card.revealed.red { background: var(--red); }
+.card.revealed.blue { background: var(--blue); }
+.card.revealed.neutral { background: var(--neutral); }
+.card.revealed.assassin { background: var(--assassin); }
+.card.latest { box-shadow: 0 0 0 3px var(--accent); }
+
+.word {
+  font-weight: 700;
+  /* Scale each word to its card width (--len is the letter count) so long words stay on one line. */
+  font-size: clamp(6.5px, calc(100cqi / (var(--len) * 0.72)), 14px);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .board { gap: 5px; }
+}
+
+.team-tag {
+  position: absolute;
+  bottom: 5px;
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.fit {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  bottom: 5px;
+  height: 13px;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fit-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent);
+  opacity: 0.55;
+}
+.fit-label {
+  position: relative;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 600;
+}
+
+.clue-form { display: flex; gap: 8px; }
+.clue-form input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+input, select, button {
+  font: inherit;
+  padding: 9px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--fg);
+}
+button { cursor: pointer; font-weight: 600; }
+button[type='submit'], .result button { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+button.link { border: none; background: none; color: var(--muted); padding: 0; font-weight: 400; text-decoration: underline; }
+
+.error { margin: 0; color: var(--error); font-size: 0.9rem; }
+.thinking { margin: 0; color: var(--accent); font-size: 0.9rem; }
+
+.result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+}
+.result p { margin: 0; font-weight: 600; }
+.result.won { border-color: var(--red); }
+
+.panel {
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 0.9rem;
+}
+.panel p { margin: 0 0 8px; }
+
+.probs { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.probs li { display: grid; grid-template-columns: 110px 1fr 52px; gap: 8px; align-items: center; }
+.prob-bar { height: 8px; border-radius: 4px; background: color-mix(in srgb, var(--fg) 10%, transparent); overflow: hidden; }
+.prob-bar span { display: block; height: 100%; background: var(--accent); }
+.num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+.log { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
+
+footer { text-align: center; }
