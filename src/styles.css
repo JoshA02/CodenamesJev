@@ -215,4 +215,17 @@ button.link { border: none; background: none; color: var(--muted); padding: 0; f
 
 .log { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
 
+.checked { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.checked li { display: grid; grid-template-columns: 110px 28px 1fr; gap: 8px; align-items: baseline; }
+.checked .clue-word { font-weight: 600; }
+.checked .num { text-align: center; color: var(--fg); font-weight: 600; }
+.checked li.unsafe { color: var(--error); }
+.checked li.unsafe .num { color: var(--error); }
+
+@media (max-width: 480px) {
+  .clue-form { flex-wrap: wrap; }
+  .clue-form input { flex-basis: 100%; }
+  .clue-form button { flex: 1; }
+}
+
 footer { text-align: center; }

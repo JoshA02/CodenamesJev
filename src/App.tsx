@@ -1,9 +1,17 @@
 import { useState, type CSSProperties, type FormEvent } from 'react';
 import { newBoard, outcome, remaining, reveal, rivalTurn, validateClue, type Card, type Team } from './game.ts';
-import { hasApiKey, pickGuess, rateClue, type Guess } from './jev.ts';
+import { hasApiKey, pickGuess, rateClue, suggestClue, type Guess, type Suggestion } from './jev.ts';
 import { RUBRIC_LABELS, type Rating } from './rubric.ts';
+import { gap, type CheckedClue } from './spymaster.ts';
 
-type Phase = 'clue' | 'scoring' | 'guessing' | 'rival';
+type Phase = 'clue' | 'suggesting' | 'scoring' | 'guessing' | 'rival';
+
+/** Why a checked clue got the number it did, in a few words. */
+function verdict(c: CheckedClue): string {
+  if (c.unsafe) return 'points at the assassin';
+  if (c.number === 0) return c.risk ? `no red word beats ${c.risk.word} safely` : 'no red word fits well';
+  return c.targets.map((t) => t.word).join(', ');
+}
 
 interface TurnLog {
   clue: string;
@@ -26,6 +34,7 @@ export default function App() {
   const [thinking, setThinking] = useState<string | null>(null);
   const [log, setLog] = useState<TurnLog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
 
   const result = outcome(board);
   const busy = phase !== 'clue';
@@ -33,6 +42,26 @@ export default function App() {
 
   function updateLog(fn: (turn: TurnLog) => TurnLog) {
     setLog((prev) => [...prev.slice(0, -1), fn(prev[prev.length - 1])]);
+  }
+
+  async function suggest() {
+    if (busy || result !== 'playing') return;
+    setError(null);
+    setSuggestion(null);
+    setPhase('suggesting');
+    try {
+      const s = await suggestClue(board, { exclude: log.map((t) => t.clue), onProgress: setThinking });
+      setSuggestion(s);
+      if (s.best) {
+        setClue(s.best.clue);
+        setNumber(s.best.number);
+      }
+    } catch (err) {
+      setError(`Jev request failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setThinking(null);
+      setPhase('clue');
+    }
   }
 
   async function playTurn(e: FormEvent) {
@@ -43,6 +72,7 @@ export default function App() {
     setError(null);
     setLastGuess(null);
     setRatings(null);
+    setSuggestion(null);
 
     let b = board;
     const hidden = () => b.filter((c) => !c.revealed).map((c) => c.word);
@@ -93,6 +123,7 @@ export default function App() {
     setLog([]);
     setError(null);
     setClue('');
+    setSuggestion(null);
   }
 
   const topChoices = lastGuess
@@ -105,7 +136,7 @@ export default function App() {
         <h1>Codenames × Jev</h1>
         <p className="hint">
           You're the <b className="t-red">red</b> spymaster. Give a one-word clue and a number. Jev rates how
-          well your clue fits every word, then picks its guesses.
+          well your clue fits every word, then picks its guesses. Stuck? Ask Jev to suggest a clue.
         </p>
         <div className="scores">
           <span className="pill red">Red left: {remaining(board, 'red')}</span>
@@ -160,6 +191,9 @@ export default function App() {
               <option key={n} value={n}>{n}</option>
             ))}
           </select>
+          <button type="button" onClick={suggest} disabled={busy || !hasApiKey}>
+            Suggest
+          </button>
           <button type="submit" disabled={busy || !clue || !!clueError || !hasApiKey}>
             Give clue
           </button>
@@ -173,6 +207,39 @@ export default function App() {
 
       {(clueError || error) && <p className="error">{error ?? clueError}</p>}
       {thinking && <p className="thinking">{thinking}</p>}
+
+      {suggestion && (
+        <section className="panel">
+          <h2>Jev's suggestion</h2>
+          {suggestion.best ? (
+            <p>
+              <b>{suggestion.best.clue}</b> for <b>{suggestion.best.number}</b>, pointing to {verdict(suggestion.best)}.
+              {suggestion.best.risk && (
+                <>
+                  {' '}The riskiest word is {suggestion.best.risk.word} ({TEAM_NAME[suggestion.best.risk.team].toLowerCase()},
+                  fit {suggestion.best.risk.score.toFixed(2)}), and every counted word beats it by at least{' '}
+                  {gap(suggestion.best).toFixed(2)}.
+                </>
+              )}
+            </p>
+          ) : (
+            <p>Jev couldn't find a safe clue among the ones it checked. Try one of your own.</p>
+          )}
+          <p className="muted">
+            Shortlisted from {suggestion.candidateCount.toLocaleString()} clues, then scored the top{' '}
+            {suggestion.checked.length} against every word:
+          </p>
+          <ul className="checked">
+            {suggestion.checked.map((c) => (
+              <li key={c.clue} className={c.unsafe ? 'unsafe' : ''}>
+                <span className="clue-word">{c.clue}</span>
+                <span className="num">{c.unsafe ? '✕' : c.number}</span>
+                <span>{verdict(c)}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {lastGuess && (
         <section className="panel">

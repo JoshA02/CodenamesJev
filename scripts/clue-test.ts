@@ -22,14 +22,17 @@
 // <name>-questions.json, for playgrounds that take state and questions separately.
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { CLUE_BANK } from '../src/clueBank.ts';
-import { newBoard, validateClue, type Card, type Team } from '../src/game.ts';
+import { newBoard, type Card, type Team } from '../src/game.ts';
 import { fitInstructions, fitState, RUBRIC, RUBRIC_LABELS, type Rating } from '../src/rubric.ts';
-import { clueNumber } from '../src/spymaster.ts';
-import { WORDS } from '../src/words.ts';
-
-const MAX_OPTIONS = 255;
-const FINALISTS_PER_GROUP = 5;
+import {
+  clueCandidates,
+  clueNumber,
+  FINALISTS_PER_GROUP,
+  spymasterState,
+  SPYMASTER_INSTRUCTIONS,
+  splitOptions,
+  topOptions,
+} from '../src/spymaster.ts';
 
 type Board = Record<Team, string[]>;
 
@@ -55,26 +58,16 @@ function loadBoard(): Board {
 }
 
 let cards: Card[];
-let state: Record<string, unknown>;
+let state: ReturnType<typeof spymasterState>;
 
 function useBoard(b: Board) {
   cards = TEAMS.flatMap((team) => b[team].map((word) => ({ word, team, revealed: false })));
-  state = {
-    game: 'Codenames',
-    role: "You are the red team's spymaster. Give one single-word clue that connects as many red words as possible.",
-    redWords: b.red,
-    avoid: { assassin: b.assassin, blueTeam: b.blue, neutral: b.neutral },
-    rules:
-      'A good clue strongly suggests several red words and does not suggest the assassin, blue words or neutral words. Pointing at the assassin loses the game instantly.',
-  };
+  state = spymasterState(cards);
 }
-
-const INSTRUCTIONS =
-  'Which candidate clue would lead a guesser to the largest number of red words, without leading them to the assassin, blue words or neutral words?';
 
 const clueQuestion = (options: string[]) => ({
   type: 'choice',
-  instructions: INSTRUCTIONS,
+  instructions: SPYMASTER_INSTRUCTIONS,
   criteria: Object.fromEntries(options.map((w) => [w, null])),
 });
 
@@ -95,14 +88,10 @@ const readAnswers = <T>(file: string): Record<string, T> => {
 };
 
 function round1() {
-  // The game's own card words make reasonable clues too, once board clashes are removed.
-  const candidates = [...new Set([...CLUE_BANK, ...WORDS])].filter((w) => validateClue(w, cards) === null).sort();
-  // Deal candidates round-robin so every group gets a mix of the alphabet.
-  const groupCount = Math.ceil(candidates.length / MAX_OPTIONS);
-  const groups: string[][] = Array.from({ length: groupCount }, () => []);
-  candidates.forEach((w, i) => groups[i % groupCount].push(w));
+  const candidates = clueCandidates(cards);
+  const groups = splitOptions(candidates);
   save('round1', Object.fromEntries(groups.map((g, i) => [`group${i + 1}`, clueQuestion(g)])));
-  console.log(`${candidates.length} candidates in ${groupCount} groups of ${groups.map((g) => g.length).join(', ')}`);
+  console.log(`${candidates.length} candidates in ${groups.length} groups of ${groups.map((g) => g.length).join(', ')}`);
 }
 
 type ChoiceAnswer = { choice: string; probabilities: Record<string, number> };
@@ -110,9 +99,7 @@ type ChoiceAnswer = { choice: string; probabilities: Record<string, number> };
 function round2() {
   const answers = readAnswers<ChoiceAnswer>('playground/round1-response.json');
   const finalists = Object.entries(answers).flatMap(([group, answer]) => {
-    const top = Object.entries(answer.probabilities)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, FINALISTS_PER_GROUP);
+    const top = topOptions(answer.probabilities, FINALISTS_PER_GROUP);
     console.log(`${group}: ${top.map(([w, p]) => `${w} ${(p * 100).toFixed(1)}%`).join(', ')}`);
     return top.map(([w]) => w);
   });
