@@ -2,6 +2,8 @@
 
 A small, solo take on the word game Codenames, built to explore [TypeSafe AI](https://typesafe.ai)'s Jev model. You're the red spymaster; Jev is your guesser.
 
+> Unofficial fan project. Not affiliated with Czech Games Edition, publisher of Codenames.
+
 ## How it plays
 
 - You see a 5x5 board with every card's team (9 red, 8 blue, 7 neutral, 1 assassin).
